@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galactic Project Hub</title>
+    <!--
+      The Tailwind CSS CDN is used here to ensure the styling works without any local setup.
+      This allows the app to be run directly from a single HTML file.
+    -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d0130;
+            color: #d1c7f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        #starfield-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .bg-card {
+            background: rgba(26, 8, 69, 0.3);
+            border: 1px solid rgba(131, 107, 255, 0.1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        .bg-card:hover {
+            border-color: rgba(76, 201, 240, 0.3);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 16px 64px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .text-accent {
+            color: #4cc9f0;
+        }
+
+        .btn-primary {
+            background-image: linear-gradient(45deg, #4361ee, #4cc9f0);
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 4px 15px rgba(76, 201, 240, 0.4);
+            animation: glow 1.5s infinite alternate;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(76, 201, 240, 0.6);
+        }
+        
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 5px #4361ee, 0 0 10px #4cc9f0; }
+            to { box-shadow: 0 0 10px #4361ee, 0 0 20px #4cc9f0; }
+        }
+
+        .btn-secondary {
+            background-color: rgba(61, 27, 122, 0.5);
+            color: #d1c7f5;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+            border: 1px solid rgba(131, 107, 255, 0.2);
+        }
+        .btn-secondary:hover {
+            background-color: rgba(93, 40, 158, 0.7);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .status-badge {
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            color: white;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+
+        .status-in-progress { 
+            background-image: linear-gradient(45deg, #fca311, #ffc94a);
+            animation: pulse-badge 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { box-shadow: 0 0 0 0px rgba(252, 163, 17, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(252, 163, 17, 0); }
+        }
+
+        .status-completed { 
+            background-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.6);
+        }
+        
+        .status-on-hold { 
+            background-color: #dc3545;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.6);
+        }
+
+        .form-input {
+            background: rgba(39, 14, 90, 0.5);
+            color: #eee;
+            border: 1px solid rgba(131, 107, 255, 0.2);
+            transition: all 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(76, 201, 240, 0.2);
+            border-color: #4cc9f0;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+        }
+        .modal-content {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        h1, h2, h3 {
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex flex-col">
+
+    <canvas id="starfield-canvas"></canvas>
+
+    <!-- Main container -->
+    <main class="max-w-7xl mx-auto flex-1 w-full relative z-10">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-[#3d1b7a]">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-4 md:mb-0">
+                Galactic Project Hub
+            </h1>
+            <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                <button id="toggle-form-btn" class="flex items-center justify-center gap-2 px-6 py-3 btn-primary rounded-full shadow-lg">
+                    <i class="fas fa-plus"></i>
+                    <span id="btn-text">Log New Mission</span>
+                </button>
+                <button id="export-data-btn" class="flex items-center justify-center gap-2 px-6 py-3 btn-secondary rounded-full shadow-lg">
+                    <i class="fas fa-download"></i>
+                    Export Data
+                </button>
+            </div>
+        </header>
+
+        <!-- User ID display for collaboration -->
+        <div id="user-info-container" class="text-center text-xs text-gray-400 mb-6 p-3 bg-card rounded-xl shadow-inner hidden">
+            <p class="font-semibold">Star-System ID:</p>
+            <p><span id="user-id" class="text-[#4cc9f0] font-mono break-all text-sm"></span></p>
+        </div>
+
+        <!-- Project Submission Form -->
+        <div id="project-form" class="bg-card p-6 rounded-xl shadow-2xl mb-8 hidden">
+            <h2 class="text-xl font-bold text-white mb-4">Log a New Mission</h2>
+            <form id="add-project-form" class="space-y-4">
+                <input
+                    type="text"
+                    id="project-name"
+                    placeholder="Mission Name"
+                    class="w-full p-3 rounded-lg form-input"
+                    required
+                />
+                <textarea
+                    id="project-description"
+                    placeholder="Mission Briefing"
+                    rows="3"
+                    class="w-full p-3 rounded-lg form-input"
+                    required
+                ></textarea>
+                <select
+                    id="project-status"
+                    class="w-full p-3 rounded-lg form-input"
+                >
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="On Hold">On Hold</option>
+                </select>
+                <button
+                    type="submit"
+                    id="submit-button"
+                    class="w-full px-6 py-3 btn-primary rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Launch Mission
+                </button>
+            </form>
+        </div>
+
+        <!-- Custom Message Box -->
+        <div id="message-box" class="fixed inset-0 flex items-center justify-center hidden modal-overlay">
+            <div class="bg-card p-6 rounded-xl shadow-2xl z-50 modal-content w-11/12 md:w-1/3">
+                <p id="message-box-content" class="text-white text-lg mb-4 text-center"></p>
+                <div class="flex justify-center">
+                    <button onclick="document.getElementById('message-box').classList.add('hidden')" class="btn-primary px-4 py-2 rounded-full">
+                        Acknowledge
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Project Modal -->
+        <div id="edit-modal" class="fixed inset-0 flex items-center justify-center hidden modal-overlay">
+            <div class="bg-card p-6 rounded-xl shadow-2xl z-50 modal-content w-11/12 md:w-1/2 lg:w-1/3">
+                <h2 class="text-xl font-bold text-white mb-4">Edit Mission</h2>
+                <form id="edit-project-form" class="space-y-4">
+                    <input type="hidden" id="edit-project-id" />
+                    <input
+                        type="text"
+                        id="edit-project-name"
+                        placeholder="Mission Name"
+                        class="w-full p-3 rounded-lg form-input"
+                        required
+                    />
+                    <textarea
+                        id="edit-project-description"
+                        placeholder="Mission Briefing"
+                        rows="3"
+                        class="w-full p-3 rounded-lg form-input"
+                        required
+                    ></textarea>
+                    <select
+                        id="edit-project-status"
+                        class="w-full p-3 rounded-lg form-input"
+                    >
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                        <option value="On Hold">On Hold</option>
+                    </select>
+                    <div class="flex flex-col md:flex-row gap-4 mt-4">
+                        <button
+                            type="submit"
+                            id="update-button"
+                            class="w-full px-6 py-3 btn-primary rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Update Mission
+                        </button>
+                        <button
+                            type="button"
+                            id="close-edit-modal"
+                            class="w-full px-6 py-3 btn-secondary rounded-full"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-modal" class="fixed inset-0 flex items-center justify-center hidden modal-overlay">
+            <div class="bg-card p-6 rounded-xl shadow-2xl z-50 modal-content w-11/12 md:w-1/3">
+                <p class="text-white text-lg mb-4 text-center">Are you sure you want to delete this mission?</p>
+                <div class="flex justify-around gap-4">
+                    <button id="confirm-delete-btn" class="btn-secondary px-4 py-2 rounded-full">
+                        Yes, Delete
+                    </button>
+                    <button id="cancel-delete-btn" class="btn-primary px-4 py-2 rounded-full">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Form Modal -->
+        <div id="contact-modal" class="fixed inset-0 flex items-center justify-center hidden modal-overlay">
+            <div class="bg-card p-6 rounded-xl shadow-2xl z-50 modal-content w-11/12 md:w-1/2 lg:w-1/3">
+                <h2 class="text-xl font-bold text-white mb-4 text-center">Get in Touch</h2>
+                <!-- CRITICAL: Update the action attribute with your Formspree form ID. -->
+                <form id="contact-form" action="https://formspree.io/f/mgvzqwkg" method="POST" class="space-y-4">
+                    <input
+                        type="text"
+                        name="name"
+                        id="contact-name"
+                        placeholder="Your Name"
+                        class="w-full p-3 rounded-lg form-input"
+                        required
+                    />
+                    <input
+                        type="email"
+                        name="email"
+                        id="contact-email"
+                        placeholder="Your Email"
+                        class="w-full p-3 rounded-lg form-input"
+                        required
+                    />
+                    <textarea
+                        name="message"
+                        id="contact-message"
+                        placeholder="Your Message"
+                        rows="4"
+                        class="w-full p-3 rounded-lg form-input"
+                        required
+                    ></textarea>
+                    <div class="flex flex-col md:flex-row gap-4 mt-4">
+                        <button
+                            type="submit"
+                            class="contact-submit-btn w-full px-6 py-3 btn-primary rounded-full"
+                        >
+                            Send Message
+                        </button>
+                        <button
+                            type="button"
+                            id="close-contact-modal"
+                            class="w-full px-6 py-3 btn-secondary rounded-full"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Projects Dashboard -->
+        <div id="projects-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Project cards will be injected here by the JavaScript -->
+            <div id="loading-indicator" class="col-span-full text-center text-gray-400 text-2xl animate-pulse">
+                <i class="fas fa-satellite-dish fa-spin mr-2"></i>
+                Loading cosmic data...
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto pt-8 pb-4 text-center text-gray-500 text-sm border-t border-[#3d1b7a] relative z-10">
+        <div class="flex justify-center space-x-6 mb-4">
+            <a href="https://goravusa27.github.io/gauravs-portfolio-v2/" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-white transition-colors duration-300">
+                <i class="fas fa-user-circle fa-2x"></i>
+            </a>
+            <a href="https://www.linkedin.com/in/gaurav-usadadiya-b57486157/" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-white transition-colors duration-300">
+                <i class="fab fa-linkedin fa-2x"></i>
+            </a>
+            <button id="open-contact-modal-btn" class="text-gray-400 hover:text-white transition-colors duration-300">
+                <i class="fas fa-envelope fa-2x"></i>
+            </button>
+        </div>
+        <p>&copy; 2024 Gaurav Usadadiya. All rights reserved.</p>
+    </footer>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, query, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // These global variables are provided by the Canvas environment.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        let app, auth, db;
+        let currentUser = null;
+        let projectsData = []; // Store project data here
+
+        const isCanvasEnvironment = initialAuthToken && firebaseConfig;
+        
+        // Initialize Firebase services conditionally
+        if (isCanvasEnvironment) {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                document.getElementById('projects-container').innerHTML = '<div class="col-span-full text-center text-red-500">Error: Failed to initialize Firebase. Please check the console for details.</div>';
+            }
+        }
+        
+        // UI element references
+        const addForm = document.getElementById('add-project-form');
+        const projectNameInput = document.getElementById('project-name');
+        const projectDescriptionInput = document.getElementById('project-description');
+        const projectStatusSelect = document.getElementById('project-status');
+        const toggleFormBtn = document.getElementById('toggle-form-btn');
+        const projectsContainer = document.getElementById('projects-container');
+        const projectFormContainer = document.getElementById('project-form');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const messageBox = document.getElementById('message-box');
+        const messageBoxContent = document.getElementById('message-box-content');
+        const userIdDisplay = document.getElementById('user-id');
+        const userInfoContainer = document.getElementById('user-info-container');
+        
+        const editModal = document.getElementById('edit-modal');
+        const editForm = document.getElementById('edit-project-form');
+        const editProjectIdInput = document.getElementById('edit-project-id');
+        const editProjectNameInput = document.getElementById('edit-project-name');
+        const editProjectDescriptionInput = document.getElementById('edit-project-description');
+        const editProjectStatusSelect = document.getElementById('edit-project-status');
+        const closeEditModalBtn = document.getElementById('close-edit-modal');
+        const updateButton = document.getElementById('update-button');
+        
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        let projectToDeleteId = null;
+
+        const contactModal = document.getElementById('contact-modal');
+        const contactForm = document.getElementById('contact-form');
+        const openContactModalBtn = document.getElementById('open-contact-modal-btn');
+        const closeContactModalBtn = document.getElementById('close-contact-modal');
+
+        // Helper to format dates
+        const formatDate = (timestamp) => {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString();
+        };
+
+        // Function to show a custom message box
+        const showMessage = (message) => {
+            messageBoxContent.textContent = message;
+            messageBox.classList.remove('hidden');
+        };
+
+        // Renders a single project card
+        const createProjectCard = (docId, project) => {
+            let statusClass = '';
+            let statusText = '';
+            let statusIcon = '';
+            let completeButtonHTML = '';
+            const isCompleted = project.status === 'Completed';
+
+            switch (project.status) {
+                case 'In Progress':
+                    statusClass = 'status-in-progress';
+                    statusText = 'In Progress';
+                    statusIcon = '<i class="fas fa-spinner fa-spin"></i>';
+                    completeButtonHTML = `<button class="btn-primary w-full px-4 py-2 text-sm rounded-full mark-complete-btn" data-id="${docId}">
+                                            <i class="fas fa-check"></i> Mark as Complete
+                                          </button>`;
+                    break;
+                case 'Completed':
+                    statusClass = 'status-completed';
+                    statusText = 'Completed';
+                    statusIcon = '<i class="fas fa-check-circle"></i>';
+                    break;
+                case 'On Hold':
+                    statusClass = 'status-on-hold';
+                    statusText = 'On Hold';
+                    statusIcon = '<i class="fas fa-pause-circle"></i>';
+                    completeButtonHTML = `<button class="btn-primary w-full px-4 py-2 text-sm rounded-full mark-complete-btn" data-id="${docId}">
+                                            <i class="fas fa-check"></i> Mark as Complete
+                                          </button>`;
+                    break;
+                default:
+                    statusClass = 'bg-gray-500';
+                    statusText = 'Unknown';
+                    statusIcon = '<i class="fas fa-question-circle"></i>';
+            }
+            
+            const card = document.createElement('div');
+            card.className = `bg-card p-6 rounded-xl shadow-md flex flex-col justify-between fade-in`;
+            
+            card.innerHTML = `
+                <div>
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xl font-semibold text-white">${project.name}</h3>
+                        <span class="status-badge ${statusClass}">
+                            ${statusIcon}
+                            ${statusText}
+                        </span>
+                    </div>
+                    <p class="text-gray-400 mb-4 text-sm">${project.description}</p>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-500 mb-4">
+                        <p><strong>Started:</strong> ${formatDate(project.startDate)}</p>
+                        ${isCompleted ? `<p><strong>Completed:</strong> ${formatDate(project.completedDate)}</p>` : ''}
+                    </div>
+                    <div class="flex gap-2 flex-col sm:flex-row">
+                        <button class="btn-secondary w-full px-4 py-2 text-sm rounded-full edit-btn" data-id="${docId}" data-name="${project.name}" data-desc="${project.description}" data-status="${project.status}">
+                            <i class="fas fa-pen"></i> Edit
+                        </button>
+                        <button class="btn-secondary w-full px-4 py-2 text-sm rounded-full delete-btn" data-id="${docId}">
+                            <i class="fas fa-trash-alt"></i> Delete
+                        </button>
+                        ${completeButtonHTML}
+                    </div>
+                </div>
+            `;
+            projectsContainer.appendChild(card);
+        };
+        
+        // Handles project form submission
+        const handleAddProject = async (e) => {
+            e.preventDefault();
+            const projectName = projectNameInput.value;
+            const projectDescription = projectDescriptionInput.value;
+            const projectStatus = projectStatusSelect.value;
+            
+            if (!projectName || !projectDescription) {
+                showMessage("Please fill in all mission details.");
+                return;
+            }
+
+            const submitBtn = addForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.textContent = 'Launching...';
+            submitBtn.disabled = true;
+
+            try {
+                if (isCanvasEnvironment) {
+                    const collectionPath = `artifacts/${appId}/public/data/company_projects`;
+                    await addDoc(collection(db, collectionPath), {
+                        name: projectName,
+                        description: projectDescription,
+                        status: projectStatus,
+                        startDate: serverTimestamp(),
+                        completedDate: projectStatus === 'Completed' ? serverTimestamp() : null,
+                        createdBy: currentUser ? currentUser.uid : 'anonymous',
+                    });
+                } else {
+                    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+                    const newProject = {
+                        id: crypto.randomUUID(),
+                        name: projectName,
+                        description: projectDescription,
+                        status: projectStatus,
+                        startDate: new Date().toISOString(),
+                        completedDate: projectStatus === 'Completed' ? new Date().toISOString() : null,
+                    };
+                    projects.push(newProject);
+                    localStorage.setItem('projects', JSON.stringify(projects));
+                }
+                
+                projectNameInput.value = '';
+                projectDescriptionInput.value = '';
+                projectStatusSelect.value = 'In Progress';
+                projectFormContainer.classList.add('hidden');
+                toggleFormBtn.innerHTML = '<i class="fas fa-plus"></i> <span id="btn-text">Log New Mission</span>';
+            } catch (error) {
+                console.error("Error adding document:", error);
+                showMessage("Failed to save mission. Please try again.");
+            } finally {
+                submitBtn.textContent = originalBtnText;
+                submitBtn.disabled = false;
+            }
+        };
+
+        // Handles updating a project's status
+        const updateProjectStatus = async (docId, newStatus) => {
+            if (isCanvasEnvironment) {
+                try {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/company_projects`, docId);
+                    await updateDoc(docRef, { 
+                        status: newStatus,
+                        completedDate: newStatus === 'Completed' ? serverTimestamp() : null
+                    });
+                    showMessage("Mission status updated successfully!");
+                } catch (error) {
+                    console.error("Error updating document:", error);
+                    showMessage("Failed to update mission status. Please try again.");
+                }
+            } else {
+                const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+                const projectIndex = projects.findIndex(p => p.id === docId);
+                if (projectIndex > -1) {
+                    projects[projectIndex].status = newStatus;
+                    projects[projectIndex].completedDate = newStatus === 'Completed' ? new Date().toISOString() : null;
+                    localStorage.setItem('projects', JSON.stringify(projects));
+                    renderProjectsFromLocalStorage();
+                    showMessage("Mission status updated successfully!");
+                }
+            }
+        };
+
+        // Handles editing a project's details from the modal
+        const handleEditProject = async (e) => {
+            e.preventDefault();
+            const docId = editProjectIdInput.value;
+            const newName = editProjectNameInput.value;
+            const newDescription = editProjectDescriptionInput.value;
+            const newStatus = editProjectStatusSelect.value;
+            
+            if (!docId || !newName || !newDescription) {
+                showMessage("Failed to update mission. Missing mission ID or details.");
+                return;
+            }
+
+            const originalBtnText = updateButton.textContent;
+            updateButton.textContent = 'Updating...';
+            updateButton.disabled = true;
+            
+            if (isCanvasEnvironment) {
+                try {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/company_projects`, docId);
+                    const currentProjectDoc = await getDoc(docRef);
+                    const currentStatus = currentProjectDoc.data().status;
+                    let updateData = {
+                        name: newName,
+                        description: newDescription,
+                        status: newStatus,
+                    };
+
+                    if (currentStatus !== 'Completed' && newStatus === 'Completed') {
+                        updateData.completedDate = serverTimestamp();
+                    } else if (currentStatus === 'Completed' && newStatus !== 'Completed') {
+                        updateData.completedDate = null;
+                    }
+
+                    await updateDoc(docRef, updateData);
+                    editModal.classList.add('hidden');
+                    showMessage("Mission updated successfully!");
+                } catch (error) {
+                    console.error("Error updating document:", error);
+                    showMessage("Failed to update mission. Please try again.");
+                } finally {
+                    updateButton.textContent = originalBtnText;
+                    updateButton.disabled = false;
+                }
+            } else {
+                const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+                const projectIndex = projects.findIndex(p => p.id === docId);
+                if (projectIndex > -1) {
+                    const currentStatus = projects[projectIndex].status;
+                    projects[projectIndex].name = newName;
+                    projects[projectIndex].description = newDescription;
+                    projects[projectIndex].status = newStatus;
+                    
+                    if (currentStatus !== 'Completed' && newStatus === 'Completed') {
+                        projects[projectIndex].completedDate = new Date().toISOString();
+                    } else if (currentStatus === 'Completed' && newStatus !== 'Completed') {
+                        projects[projectIndex].completedDate = null;
+                    }
+                    localStorage.setItem('projects', JSON.stringify(projects));
+                    renderProjectsFromLocalStorage();
+                    showMessage("Mission updated successfully!");
+                }
+                editModal.classList.add('hidden');
+                updateButton.textContent = originalBtnText;
+                updateButton.disabled = false;
+            }
+        };
+
+        // Handles deleting a project
+        const handleDeleteProject = async () => {
+            if (!projectToDeleteId) {
+                console.error("No project ID to delete.");
+                return;
+            }
+
+            if (isCanvasEnvironment) {
+                try {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/company_projects`, projectToDeleteId);
+                    await deleteDoc(docRef);
+                    deleteModal.classList.add('hidden');
+                    showMessage("Mission deleted successfully.");
+                } catch (error) {
+                    console.error("Error deleting document:", error);
+                    showMessage("Failed to delete mission. Please try again.");
+                }
+            } else {
+                const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+                const filteredProjects = projects.filter(p => p.id !== projectToDeleteId);
+                localStorage.setItem('projects', JSON.stringify(filteredProjects));
+                deleteModal.classList.add('hidden');
+                renderProjectsFromLocalStorage();
+                showMessage("Mission deleted successfully.");
+            }
+            projectToDeleteId = null; // Clear the ID after deletion
+        };
+
+        // Handles contact form submission (now sends to Formspree)
+        const handleContactFormSubmit = async (e) => {
+            e.preventDefault();
+
+            const form = e.target;
+            const submitBtn = form.querySelector('.contact-submit-btn');
+            const originalText = submitBtn.textContent;
+
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(form.action, {
+                    method: form.method,
+                    body: new FormData(form),
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    form.reset();
+                    contactModal.classList.add('hidden');
+                    showMessage("Your message has been sent successfully!");
+                } else {
+                    showMessage("Failed to send your message. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error submitting form:", error);
+                showMessage("An error occurred. Please try again.");
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        };
+
+        // Function to create a downloadable CSV file
+        const exportDataAsCsv = () => {
+            if (projectsData.length === 0) {
+                showMessage("No missions to export.");
+                return;
+            }
+
+            // Define the CSV header
+            let csv = "ID,Name,Description,Status,Start Date,Completion Date\n";
+
+            // Map the data to CSV format
+            projectsData.forEach(p => {
+                const project = p.data;
+                const docId = p.id;
+                
+                // Escape commas and quotes within the data
+                const escapeCsv = (val) => {
+                    if (val && typeof val === 'string') {
+                        return `"${val.replace(/"/g, '""')}"`;
+                    }
+                    return val || '';
+                };
+
+                const name = escapeCsv(project.name);
+                const description = escapeCsv(project.description);
+                const status = escapeCsv(project.status);
+                const startDate = formatDate(project.startDate);
+                const completedDate = project.completedDate ? formatDate(project.completedDate) : 'N/A';
+
+                csv += `${docId},${name},${description},${status},${startDate},${completedDate}\n`;
+            });
+
+            // Create a Blob and a link to download the file
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'galactic_projects.csv');
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showMessage("Mission data exported successfully!");
+        };
+
+        // Render projects from local storage
+        const renderProjectsFromLocalStorage = () => {
+            projectsContainer.innerHTML = '';
+            projectsData = JSON.parse(localStorage.getItem('projects') || '[]').map(p => ({id: p.id, data: p}));
+            
+            // Sort projects by startDate in descending order
+            const sortedProjects = projectsData.sort((a, b) => new Date(b.data.startDate) - new Date(a.data.startDate));
+
+            if (sortedProjects.length === 0) {
+                projectsContainer.innerHTML = '<div class="col-span-full text-center text-gray-400 text-xl mt-8"><i class="fas fa-rocket text-[#4cc9f0] mr-2"></i>No missions found. Let\'s launch our first one!</div>';
+            } else {
+                sortedProjects.forEach(project => createProjectCard(project.id, project.data));
+            }
+        };
+
+        // Attaches a real-time listener to the projects collection (for Canvas)
+        const setupProjectsListener = () => {
+            const collectionPath = `artifacts/${appId}/public/data/company_projects`;
+            const projectsCollection = collection(db, collectionPath);
+            const projectsQuery = query(projectsCollection);
+
+            onSnapshot(projectsQuery, (snapshot) => {
+                projectsContainer.innerHTML = '';
+                if (snapshot.empty) {
+                    projectsContainer.innerHTML = '<div class="col-span-full text-center text-gray-400 text-xl mt-8"><i class="fas fa-rocket text-[#4cc9f0] mr-2"></i>No missions found. Let\'s launch our first one!</div>';
+                    projectsData = [];
+                } else {
+                    // Store the data in the projectsData array and sort it in-memory
+                    projectsData = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+                    const sortedDocs = projectsData.sort((a, b) => b.data.startDate.toMillis() - a.data.startDate.toMillis());
+                    sortedDocs.forEach(project => createProjectCard(project.id, project.data));
+                }
+            }, (error) => {
+                console.error("Error fetching documents:", error);
+                projectsContainer.innerHTML = `<div class="col-span-full text-center text-red-500">Failed to load projects. Please check the console.</div>`;
+            });
+        };
+        
+        // Auth state handler for Canvas environment
+        const authHandler = async (user) => {
+            if (user) {
+                currentUser = user;
+                userIdDisplay.textContent = user.uid;
+                userInfoContainer.classList.remove('hidden');
+                if (isCanvasEnvironment) {
+                    setupProjectsListener();
+                } else {
+                    renderProjectsFromLocalStorage();
+                }
+            } else {
+                if (isCanvasEnvironment) {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication error:", error);
+                        showMessage("Authentication failed. Please check the console.");
+                    }
+                } else {
+                    renderProjectsFromLocalStorage();
+                }
+            }
+        };
+
+        // Starfield Canvas Animation
+        const setupStarfield = () => {
+            const canvas = document.getElementById('starfield-canvas');
+            const ctx = canvas.getContext('2d');
+            let stars = [];
+            let mouseX = window.innerWidth / 2;
+            let mouseY = window.innerHeight / 2;
+
+            const resizeCanvas = () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                createStars();
+            };
+
+            const createStars = () => {
+                stars = [];
+                for (let i = 0; i < 500; i++) {
+                    stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        radius: Math.random() * 1.5,
+                        speed: Math.random() * 0.5 + 0.1,
+                        opacity: Math.random()
+                    });
+                }
+            };
+
+            const drawStars = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                stars.forEach(star => {
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                    ctx.fill();
+                });
+            };
+
+            const updateStars = () => {
+                stars.forEach(star => {
+                    const dx = star.x - mouseX;
+                    const dy = star.y - mouseY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const force = 10 / (dist * dist);
+
+                    star.x += star.speed * (dx > 0 ? 1 : -1) * force;
+                    star.y += star.speed * (dy > 0 ? 1 : -1) * force;
+                    
+                    star.x += star.speed * 0.1;
+
+                    if (star.x > canvas.width) {
+                        star.x = 0;
+                        star.y = Math.random() * canvas.height;
+                    }
+                });
+            };
+
+            const animate = () => {
+                updateStars();
+                drawStars();
+                requestAnimationFrame(animate);
+            };
+
+            window.addEventListener('resize', resizeCanvas);
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+            });
+            resizeCanvas();
+            animate();
+        };
+
+        // Event listeners setup
+        const setupEventListeners = () => {
+            addForm.addEventListener('submit', handleAddProject);
+            editForm.addEventListener('submit', handleEditProject);
+            confirmDeleteBtn.addEventListener('click', handleDeleteProject);
+            cancelDeleteBtn.addEventListener('click', () => deleteModal.classList.add('hidden'));
+            document.getElementById('export-data-btn').addEventListener('click', exportDataAsCsv);
+            openContactModalBtn.addEventListener('click', () => contactModal.classList.remove('hidden'));
+            closeContactModalBtn.addEventListener('click', () => contactModal.classList.add('hidden'));
+            contactForm.addEventListener('submit', handleContactFormSubmit);
+
+
+            toggleFormBtn.addEventListener('click', () => {
+                projectFormContainer.classList.toggle('hidden');
+                const btnText = document.getElementById('btn-text');
+                const icon = toggleFormBtn.querySelector('i');
+                if (projectFormContainer.classList.contains('hidden')) {
+                    btnText.textContent = 'Log New Mission';
+                    icon.className = 'fas fa-plus';
+                } else {
+                    btnText.textContent = 'Cancel';
+                    icon.className = 'fas fa-times';
+                }
+            });
+            
+            closeEditModalBtn.addEventListener('click', () => {
+                editModal.classList.add('hidden');
+            });
+            
+            projectsContainer.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn');
+                if (editBtn) {
+                    editProjectIdInput.value = editBtn.dataset.id;
+                    editProjectNameInput.value = editBtn.dataset.name;
+                    editProjectDescriptionInput.value = editBtn.dataset.desc;
+                    editProjectStatusSelect.value = editBtn.dataset.status;
+                    editModal.classList.remove('hidden');
+                }
+                
+                const completeBtn = e.target.closest('.mark-complete-btn');
+                if (completeBtn) {
+                    const projectId = completeBtn.dataset.id;
+                    updateProjectStatus(projectId, 'Completed');
+                }
+                
+                const deleteBtn = e.target.closest('.delete-btn');
+                if (deleteBtn) {
+                    projectToDeleteId = deleteBtn.dataset.id;
+                    deleteModal.classList.remove('hidden');
+                }
+            });
+        };
+
+        window.onload = () => {
+            setupStarfield();
+            setupEventListeners();
+            if (isCanvasEnvironment) {
+                onAuthStateChanged(auth, authHandler);
+            } else {
+                authHandler(null);
+            }
+        };
+    </script>
+</body>
+</html>
